@@ -28,6 +28,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -529,7 +530,10 @@ public class Engine {
                         cameraName = ti.tags.getString("Camera");
                      } catch (Exception e) {
                         //continue waiting
-                        if (!core_.isSequenceRunning() && core_.getRemainingImageCount() == 0) {
+                        // every camera of the sequence, not only the Core camera: another
+                        // camera can still be delivering after the Core camera has finished
+                        if (!isAnySequenceRunning(cameraImageCounts.keySet())
+                                && core_.getRemainingImageCount() == 0) {
                            throw new RuntimeException("Expected images did not arrive in circular buffer");
                         }
                         // check it timeout has been exceeded. This is used in the case of a camera waiting for
@@ -658,6 +662,19 @@ public class Engine {
       if (timeout) {
          throw new TimeoutException("Timeout waiting for images to arrive in circular buffer");
       }
+   }
+
+   /**
+    * Whether any of the given cameras is still running a sequence. Checked before the
+    * buffer count: a camera inserts its last image before it reports that it stopped.
+    */
+   private boolean isAnySequenceRunning(Set<String> cameraDeviceNames) throws Exception {
+      for (String cameraDeviceName : cameraDeviceNames) {
+         if (core_.isSequenceRunning(cameraDeviceName)) {
+            return true;
+         }
+      }
+      return false;
    }
 
    private void abortIfRequested(AcquisitionEvent event,
